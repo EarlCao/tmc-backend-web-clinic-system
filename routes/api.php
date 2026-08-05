@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\RoleController;
@@ -38,4 +39,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/roles/{role}', [RoleController::class, 'update'])->middleware('permission:roles.update');
     Route::delete('/roles/{role}', [RoleController::class, 'destroy'])->middleware('permission:roles.delete');
     Route::put('/roles/{role}/permissions', [RoleController::class, 'updatePermissions'])->middleware('permission:roles.assign_permissions');
+
+    // Appointments (Module 3)
+    Route::middleware('permission:appointments.view')->group(function () {
+        Route::get('/appointments', [AppointmentController::class, 'index']);
+        Route::get('/appointments/{appointment}', [AppointmentController::class, 'show']);
+    });
+
+    Route::post('/appointments', [AppointmentController::class, 'store'])->middleware('permission:appointments.create');
+    // The target status determines the required permission (approve/reject/update),
+    // so the check happens inside the controller rather than a static middleware.
+    Route::patch('/appointments/{appointment}/status', [AppointmentController::class, 'updateStatus']);
+    Route::post('/appointments/{appointment}/reschedule', [AppointmentController::class, 'reschedule'])->middleware('permission:appointments.reschedule');
 });
