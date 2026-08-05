@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -17,9 +18,13 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
+        $staffRoleId = Role::where('name', 'staff')->value('id');
+        $adminRoleId = Role::where('name', 'admin')->value('id');
+
         User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
+            'role_id' => $staffRoleId,
         ]);
 
         // Default TMC administrator — matches the email shown on the login
@@ -29,7 +34,9 @@ class DatabaseSeeder extends Seeder
             'name' => 'TMC Administrator',
             'email' => 'admin@tmc.edu.ph',
             'password' => 'admin123',
-            'role' => 'admin',
+            'role_id' => $adminRoleId,
         ]);
+
+        $this->call(RolesAndPermissionsSeeder::class);
     }
 }

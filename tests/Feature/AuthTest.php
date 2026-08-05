@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -12,10 +13,13 @@ class AuthTest extends TestCase
 
     private function createUser(array $attributes = []): User
     {
+        // The base roles are inserted by the roles migration.
+        $adminRole = Role::where('name', 'admin')->firstOrFail();
+
         return User::factory()->create(array_merge([
             'email' => 'admin@tmc.edu.ph',
             'password' => 'admin123',
-            'role' => 'admin',
+            'role_id' => $adminRole->id,
         ], $attributes));
     }
 
@@ -29,7 +33,7 @@ class AuthTest extends TestCase
         ]);
 
         $response->assertOk()
-            ->assertJsonStructure(['token', 'user' => ['id', 'name', 'email', 'role']])
+            ->assertJsonStructure(['token', 'user' => ['id', 'name', 'email', 'role', 'permissions']])
             ->assertJsonPath('user.email', 'admin@tmc.edu.ph')
             ->assertJsonPath('user.role', 'admin');
     }

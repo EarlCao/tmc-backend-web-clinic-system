@@ -65,19 +65,23 @@ class AuthController extends Controller
     /**
      * Shape the user payload exposed through the API.
      *
-     * Passwords and tokens are never included; `role` is surfaced now so the
-     * upcoming authorization phase can gate modules without another round of
-     * API changes.
+     * Passwords and tokens are never included. `role` is the role name and
+     * `permissions` the granted permission keys (module.action), which the
+     * frontend uses for module access control — the Laravel backend remains
+     * the enforcement boundary.
      *
      * @return array<string, mixed>
      */
     private function userPayload(User $user): array
     {
+        $user->loadMissing('role.permissions');
+
         return [
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
-            'role' => $user->role,
+            'role' => $user->role?->name,
+            'permissions' => $user->role?->permissions->pluck('name')->values()->all() ?? [],
         ];
     }
 }

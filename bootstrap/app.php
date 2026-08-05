@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\CheckPermission;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -19,6 +20,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // the SPA login path instead; JSON API clients (Accept:
         // application/json) still receive 401 responses.
         $middleware->redirectGuestsTo('/login');
+
+        // Module 2 — role/permission checks, e.g. `permission:roles.create`.
+        $middleware->alias(['permission' => CheckPermission::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
