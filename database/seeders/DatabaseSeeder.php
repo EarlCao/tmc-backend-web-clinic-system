@@ -21,5 +21,15 @@ class DatabaseSeeder extends Seeder
             'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
+
+        // Default TMC administrator — matches the email shown on the login
+        // page. The password is hashed by the model's `hashed` cast and is
+        // never returned by the API.
+        User::factory()->create([
+            'name' => 'TMC Administrator',
+            'email' => 'admin@tmc.edu.ph',
+            'password' => 'admin123',
+            'role' => 'admin',
+        ]);
     }
 }
