@@ -6,6 +6,7 @@ use Database\Factories\AppointmentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'reference', 'patient', 'patient_id', 'type', 'reason', 'date', 'time',
@@ -68,6 +69,14 @@ class Appointment extends Model
             'date' => 'date:Y-m-d',
             'requested_on' => 'date:Y-m-d',
         ];
+    }
+
+    /**
+     * Consultations started from this appointment (Module 4 integration).
+     */
+    public function consultations(): HasMany
+    {
+        return $this->hasMany(Consultation::class, 'appointment_id');
     }
 
     /**

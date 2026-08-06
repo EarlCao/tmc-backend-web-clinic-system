@@ -68,7 +68,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/patients', [PatientController::class, 'store'])->middleware('permission:patients.create');
 
     // Consultations
-    Route::get('/consultations', [ConsultationController::class, 'index'])->middleware('permission:consultations.view');
+    Route::middleware('permission:consultations.view')->group(function () {
+        Route::get('/consultations', [ConsultationController::class, 'index']);
+        Route::get('/consultations/{consultation}', [ConsultationController::class, 'show']);
+    });
+
     Route::post('/consultations', [ConsultationController::class, 'store'])->middleware('permission:consultations.create');
     Route::post('/consultations/{consultation}/start', [ConsultationController::class, 'start'])->middleware('permission:consultations.create');
     Route::patch('/consultations/{consultation}', [ConsultationController::class, 'update'])->middleware('permission:consultations.update');

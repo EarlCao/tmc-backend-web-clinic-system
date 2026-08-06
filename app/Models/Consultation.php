@@ -4,9 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'reference', 'date', 'time', 'patient', 'patient_id', 'staff', 'status',
+    'reference', 'date', 'time', 'patient', 'patient_id', 'appointment_id', 'staff', 'status',
     'chief_complaint', 'vitals', 'clinical_findings', 'diagnosis', 'treatment',
     'disposition', 'started_at', 'completed_at',
 ])]
@@ -28,6 +29,14 @@ class Consultation extends Model
             'date' => 'date:Y-m-d',
             'vitals' => 'array',
         ];
+    }
+
+    /**
+     * The appointment this consultation was started from, when applicable.
+     */
+    public function appointment(): BelongsTo
+    {
+        return $this->belongsTo(Appointment::class, 'appointment_id');
     }
 
     /**
