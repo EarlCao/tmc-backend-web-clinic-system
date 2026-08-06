@@ -137,7 +137,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'appointments.view',
             'consultations.view', 'consultations.create', 'consultations.update',
             'medical_records.view', 'medical_records.create', 'medical_records.update',
-            'medical_certificates.view', 'medical_certificates.create',
+            'medical_certificates.view', 'medical_certificates.create', 'medical_certificates.update',
             'prescriptions.view', 'prescriptions.create',
             'patients.view', 'patients.create',
             'schedules.view',

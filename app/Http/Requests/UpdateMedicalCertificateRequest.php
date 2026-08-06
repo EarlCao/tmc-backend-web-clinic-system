@@ -1,0 +1,48 @@
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Foundation\Http\FormRequest;
+
+class UpdateMedicalCertificateRequest extends FormRequest
+{
+    /**
+     * Determine if the user is authorized to make this request.
+     *
+     * Authorization is enforced by the `permission:medical_certificates.update`
+     * middleware on the route; the form request only validates the payload.
+     */
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Get the validation rules that apply to the request.
+     *
+     * Partial updates are allowed — only the provided fields are patched.
+     * `status` is constrained to the certificate lifecycle values.
+     *
+     * @return array<string, ValidationRule|array<mixed>|string>
+     */
+    public function rules(): array
+    {
+        return [
+            'patient' => ['sometimes', 'string', 'max:255'],
+            'patient_id' => ['nullable', 'string', 'max:255'],
+            'consultation_id' => ['nullable', 'integer', 'exists:consultations,id'],
+            'medical_record_id' => ['nullable', 'integer', 'exists:medical_records,id'],
+            'issued_by' => ['nullable', 'string', 'max:255'],
+            'purpose' => ['sometimes', 'string', 'max:255'],
+            'diagnosis' => ['nullable', 'string', 'max:255'],
+            'recommendation' => ['nullable', 'string'],
+            // `required_with` keeps partial updates sane: if `valid_until` is
+            // sent without `issue_date`, Laravel's after_or_equal would
+            // silently compare against today instead of the stored date.
+            'issue_date' => ['sometimes', 'date', 'required_with:valid_until'],
+            'valid_until' => ['nullable', 'date', 'after_or_equal:issue_date'],
+            'status' => ['sometimes', 'string', 'in:Issued,Void'],
+        ];
+    }
+}

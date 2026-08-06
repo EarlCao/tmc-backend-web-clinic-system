@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ClinicEventController;
 use App\Http\Controllers\ClinicInsightsController;
 use App\Http\Controllers\ConsultationController;
+use App\Http\Controllers\MedicalCertificateController;
 use App\Http\Controllers\MedicalRecordController;
 use App\Http\Controllers\PatientController;
 use App\Http\Controllers\PermissionController;
@@ -109,6 +110,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/medical-records/{record}/allergies/{allergy}', [MedicalRecordController::class, 'updateAllergy']);
         Route::delete('/medical-records/{record}/allergies/{allergy}', [MedicalRecordController::class, 'destroyAllergy']);
     });
+
+    // Medical certificates
+    Route::middleware('permission:medical_certificates.view')->group(function () {
+        Route::get('/medical-certificates', [MedicalCertificateController::class, 'index']);
+        Route::get('/medical-certificates/{certificate}', [MedicalCertificateController::class, 'show']);
+    });
+
+    Route::post('/medical-certificates', [MedicalCertificateController::class, 'store'])->middleware('permission:medical_certificates.create');
+    Route::patch('/medical-certificates/{certificate}', [MedicalCertificateController::class, 'update'])->middleware('permission:medical_certificates.update');
+    Route::delete('/medical-certificates/{certificate}', [MedicalCertificateController::class, 'destroy'])->middleware('permission:medical_certificates.delete');
 
     // Campus health events
     Route::get('/events', [ClinicEventController::class, 'index'])->middleware('permission:calendar.view');
