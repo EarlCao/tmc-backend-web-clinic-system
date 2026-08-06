@@ -31,6 +31,7 @@ class StoreMedicalCertificateRequest extends FormRequest
             'consultation_id' => ['nullable', 'integer', 'exists:consultations,id'],
             'medical_record_id' => ['nullable', 'integer', 'exists:medical_records,id'],
             'issued_by' => ['nullable', 'string', 'max:255'],
+            'requested_by' => ['nullable', 'string', 'max:255'],
             'purpose' => ['required', 'string', 'max:255'],
             'diagnosis' => ['nullable', 'string', 'max:255'],
             'recommendation' => ['nullable', 'string'],

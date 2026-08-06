@@ -16,8 +16,11 @@ class MedicalCertificatesTest extends TestCase
 
     private const ALL_PERMISSIONS = [
         'medical_certificates.view', 'medical_certificates.create',
-        'medical_certificates.update', 'medical_certificates.delete',
+        'medical_certificates.update', 'medical_certificates.approve',
+        'medical_certificates.delete',
     ];
+
+    private const ISSUER_NAME = 'Dr. Test Mendoza';
 
     /** Create the given permissions (idempotently) and return their ids. */
     private function permissions(array $names): array
@@ -38,7 +41,7 @@ class MedicalCertificatesTest extends TestCase
         $role = Role::where('name', 'admin')->firstOrFail();
         $role->permissions()->sync($this->permissions(self::ALL_PERMISSIONS));
 
-        return User::factory()->create(['role_id' => $role->id]);
+        return User::factory()->create(['name' => self::ISSUER_NAME, 'role_id' => $role->id]);
     }
 
     /** User whose role holds exactly the given permissions. */
@@ -65,6 +68,7 @@ class MedicalCertificatesTest extends TestCase
             'consultation_id' => null,
             'medical_record_id' => null,
             'issued_by' => 'Dr. R. Mendoza',
+            'requested_by' => 'Nurse C. Villanueva',
             'purpose' => 'Medical Excuse — Clinic Visit',
             'diagnosis' => 'Mild Flu Symptoms',
             'recommendation' => 'Rest and hydration.',
@@ -81,6 +85,9 @@ class MedicalCertificatesTest extends TestCase
         $this->getJson('/api/medical-certificates')->assertUnauthorized();
         $this->getJson('/api/medical-certificates/1')->assertUnauthorized();
         $this->postJson('/api/medical-certificates', ['patient' => 'X', 'purpose' => 'Y'])->assertUnauthorized();
+        $this->postJson('/api/medical-certificates/1/approve')->assertUnauthorized();
+        $this->postJson('/api/medical-certificates/1/reject', ['rejection_reason' => 'No'])->assertUnauthorized();
+        $this->postJson('/api/medical-certificates/1/issue')->assertUnauthorized();
         $this->patchJson('/api/medical-certificates/1', ['status' => 'Void'])->assertUnauthorized();
         $this->deleteJson('/api/medical-certificates/1')->assertUnauthorized();
     }
@@ -109,7 +116,8 @@ class MedicalCertificatesTest extends TestCase
             ->assertOk()
             ->assertJsonStructure(['data' => [[
                 'id', 'reference', 'patient', 'patientId', 'consultationId', 'medicalRecordId',
-                'issuedBy', 'purpose', 'diagnosis', 'recommendation', 'issueDate',
+                'issuedBy', 'requestedBy', 'approvedBy', 'approvedAt', 'rejectedBy', 'rejectedAt', 'rejectionReason',
+                'purpose', 'diagnosis', 'recommendation', 'issueDate',
                 'validUntil', 'status', 'issuedAt',
             ]]])
             ->assertJsonPath('data.0.patient', 'Frontend Shape Case');
@@ -187,7 +195,8 @@ class MedicalCertificatesTest extends TestCase
         ])
             ->assertCreated()
             ->assertJsonPath('data.patient', 'Rica Bautista')
-            ->assertJsonPath('data.status', 'Issued')
+            ->assertJsonPath('data.status', 'Pending')
+            ->assertJsonPath('data.requestedBy', self::ISSUER_NAME)
             ->assertJsonPath('data.purpose', 'Medical Excuse — Clinic Visit')
             ->assertJsonPath('data.issueDate', now()->toDateString())
             ->assertJsonPath('data.reference', 'MC-2026-001');
@@ -195,7 +204,8 @@ class MedicalCertificatesTest extends TestCase
         $this->assertDatabaseHas('medical_certificates', [
             'patient' => 'Rica Bautista',
             'reference' => 'MC-2026-001',
-            'status' => 'Issued',
+            'status' => 'Pending',
+            'requested_by' => self::ISSUER_NAME,
         ]);
     }
 
@@ -325,9 +335,157 @@ class MedicalCertificatesTest extends TestCase
         $certificate = $this->makeCertificate();
 
         $this->actingAsUser($admin);
-        $this->patchJson("/api/medical-certificates/{$certificate->id}", ['status' => 'Pending'])
+        $this->patchJson("/api/medical-certificates/{$certificate->id}", ['status' => 'Archived'])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['status']);
+    }
+
+    public function test_update_cannot_bypass_the_workflow_via_status_patch(): void
+    {
+        $admin = $this->adminUser();
+        $certificate = $this->makeCertificate(['status' => 'Pending']);
+
+        $this->actingAsUser($admin);
+        // Only Void is a valid PATCH target — jumping straight to Issued (or
+        // even Approved) would skip the audit trail, so it must be rejected.
+        $this->patchJson("/api/medical-certificates/{$certificate->id}", ['status' => 'Issued'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['status']);
+        $this->patchJson("/api/medical-certificates/{$certificate->id}", ['status' => 'Approved'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['status']);
+
+        $this->assertDatabaseHas('medical_certificates', ['id' => $certificate->id, 'status' => 'Pending']);
+    }
+
+    // --- Workflow: review (approve / reject) -------------------------------
+
+    public function test_approve_and_reject_require_approve_permission(): void
+    {
+        $noApprove = $this->userWithPermissions([
+            'medical_certificates.view', 'medical_certificates.create', 'medical_certificates.update',
+        ]);
+        $certificate = $this->makeCertificate(['status' => 'Pending']);
+
+        $this->actingAsUser($noApprove);
+        $this->postJson("/api/medical-certificates/{$certificate->id}/approve")->assertForbidden();
+        $this->postJson("/api/medical-certificates/{$certificate->id}/reject", ['rejection_reason' => 'No'])->assertForbidden();
+    }
+
+    public function test_admin_can_approve_a_pending_request_with_audit_trail(): void
+    {
+        $admin = $this->adminUser();
+        $certificate = $this->makeCertificate(['status' => 'Pending']);
+
+        $this->actingAsUser($admin);
+        $this->postJson("/api/medical-certificates/{$certificate->id}/approve")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'Approved')
+            ->assertJsonPath('data.approvedBy', self::ISSUER_NAME)
+            ->assertJsonPath('data.approvedAt', $certificate->fresh()->approved_at->toIso8601String());
+
+        $this->assertDatabaseHas('medical_certificates', [
+            'id' => $certificate->id,
+            'status' => 'Approved',
+            'approved_by' => self::ISSUER_NAME,
+        ]);
+    }
+
+    public function test_approve_rejects_non_pending_certificates(): void
+    {
+        $admin = $this->adminUser();
+        $this->actingAsUser($admin);
+
+        foreach (['Approved', 'Issued', 'Rejected', 'Void'] as $status) {
+            $certificate = $this->makeCertificate(['status' => $status]);
+            $this->postJson("/api/medical-certificates/{$certificate->id}/approve")
+                ->assertStatus(422);
+        }
+    }
+
+    public function test_admin_can_reject_a_pending_request_with_reason(): void
+    {
+        $admin = $this->adminUser();
+        $certificate = $this->makeCertificate(['status' => 'Pending']);
+
+        $this->actingAsUser($admin);
+        $this->postJson("/api/medical-certificates/{$certificate->id}/reject", [
+            'rejection_reason' => 'Insufficient documentation.',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'Rejected')
+            ->assertJsonPath('data.rejectedBy', self::ISSUER_NAME)
+            ->assertJsonPath('data.rejectionReason', 'Insufficient documentation.');
+
+        $this->assertDatabaseHas('medical_certificates', [
+            'id' => $certificate->id,
+            'status' => 'Rejected',
+            'rejected_by' => self::ISSUER_NAME,
+            'rejection_reason' => 'Insufficient documentation.',
+        ]);
+    }
+
+    // --- Workflow: issue ---------------------------------------------------
+
+    public function test_issue_requires_update_permission(): void
+    {
+        $approveOnly = $this->userWithPermissions([
+            'medical_certificates.view', 'medical_certificates.create', 'medical_certificates.approve',
+        ]);
+        $certificate = $this->makeCertificate(['status' => 'Approved']);
+
+        $this->actingAsUser($approveOnly);
+        $this->postJson("/api/medical-certificates/{$certificate->id}/issue")->assertForbidden();
+    }
+
+    public function test_admin_can_issue_an_approved_certificate(): void
+    {
+        $admin = $this->adminUser();
+        $certificate = $this->makeCertificate([
+            'status' => 'Approved',
+            'issued_by' => '',
+            'issue_date' => '2026-08-10',
+        ]);
+
+        $this->actingAsUser($admin);
+        $this->postJson("/api/medical-certificates/{$certificate->id}/issue")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'Issued')
+            ->assertJsonPath('data.issuedBy', self::ISSUER_NAME)
+            ->assertJsonPath('data.issueDate', '2026-08-10');
+
+        $this->assertDatabaseHas('medical_certificates', [
+            'id' => $certificate->id,
+            'status' => 'Issued',
+            'issued_by' => self::ISSUER_NAME,
+        ]);
+    }
+
+    public function test_issue_honors_explicit_issuer_and_date(): void
+    {
+        $admin = $this->adminUser();
+        $certificate = $this->makeCertificate(['status' => 'Approved', 'issue_date' => '2026-08-10']);
+
+        $this->actingAsUser($admin);
+        $this->postJson("/api/medical-certificates/{$certificate->id}/issue", [
+            'issued_by' => 'Dr. S. Lopez',
+            'issue_date' => '2026-08-12',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.issuedBy', 'Dr. S. Lopez')
+            ->assertJsonPath('data.issueDate', '2026-08-12');
+    }
+
+    public function test_issue_rejects_non_approved_certificates(): void
+    {
+        $admin = $this->adminUser();
+        $this->actingAsUser($admin);
+
+        foreach (['Pending', 'Rejected', 'Void'] as $status) {
+            $certificate = $this->makeCertificate(['status' => $status]);
+            $this->postJson("/api/medical-certificates/{$certificate->id}/issue")
+                ->assertStatus(422);
+        }
     }
 
     // --- Delete ------------------------------------------------------------

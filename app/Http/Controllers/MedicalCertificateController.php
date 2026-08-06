@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ReviewMedicalCertificateRequest;
 use App\Http\Requests\StoreMedicalCertificateRequest;
 use App\Http\Requests\UpdateMedicalCertificateRequest;
 use App\Http\Resources\MedicalCertificateResource;
@@ -55,18 +56,19 @@ class MedicalCertificateController extends Controller
     }
 
     /**
-     * Generate a new medical certificate.
+     * Submit a new medical certificate request.
      *
      * Reuses existing patient/consultation/medical-record data; the reference
      * is assigned sequentially for the issue date (MC-YYYY-NNN) inside the
-     * transaction so concurrent generation cannot collide.
+     * transaction so concurrent requests cannot collide. The certificate is
+     * created as a `Pending` request awaiting review and approval.
      */
     public function store(StoreMedicalCertificateRequest $request): JsonResponse
     {
         $validated = $request->validated();
         $issueDate = $validated['issue_date'] ?? now()->toDateString();
 
-        $certificate = DB::transaction(function () use ($validated, $issueDate) {
+        $certificate = DB::transaction(function () use ($request, $validated, $issueDate) {
             return MedicalCertificate::create([
                 'reference' => MedicalCertificate::nextReference($issueDate, true),
                 'patient' => $validated['patient'],
@@ -74,16 +76,90 @@ class MedicalCertificateController extends Controller
                 'consultation_id' => $validated['consultation_id'] ?? null,
                 'medical_record_id' => $validated['medical_record_id'] ?? null,
                 'issued_by' => $validated['issued_by'] ?? '',
+                'requested_by' => $validated['requested_by'] ?? $request->user()->name,
                 'purpose' => $validated['purpose'],
                 'diagnosis' => $validated['diagnosis'] ?? '',
                 'recommendation' => $validated['recommendation'] ?? '',
                 'issue_date' => $issueDate,
                 'valid_until' => $validated['valid_until'] ?? null,
-                'status' => 'Issued',
+                'status' => 'Pending',
             ]);
         });
 
         return (new MedicalCertificateResource($certificate))->response()->setStatusCode(201);
+    }
+
+    /**
+     * Approve a pending certificate request.
+     *
+     * Records who approved and when for the audit trail. Only requests in
+     * `Pending` can be approved — the state machine lives in the model.
+     */
+    public function approve(MedicalCertificate $certificate, ReviewMedicalCertificateRequest $request): MedicalCertificateResource|JsonResponse
+    {
+        if (! $certificate->canTransitionTo('Approved')) {
+            return response()->json([
+                'message' => "Cannot approve a certificate in \"{$certificate->status}\" status.",
+            ], 422);
+        }
+
+        $certificate->update([
+            'status' => 'Approved',
+            'approved_by' => $request->user()->name,
+            'approved_at' => now(),
+        ]);
+
+        return new MedicalCertificateResource($certificate);
+    }
+
+    /**
+     * Reject a pending certificate request.
+     *
+     * The optional rejection reason is kept so the requester can understand
+     * why the request was turned down. Only `Pending` requests can be rejected.
+     */
+    public function reject(MedicalCertificate $certificate, ReviewMedicalCertificateRequest $request): MedicalCertificateResource|JsonResponse
+    {
+        if (! $certificate->canTransitionTo('Rejected')) {
+            return response()->json([
+                'message' => "Cannot reject a certificate in \"{$certificate->status}\" status.",
+            ], 422);
+        }
+
+        $certificate->update([
+            'status' => 'Rejected',
+            'rejected_by' => $request->user()->name,
+            'rejected_at' => now(),
+            'rejection_reason' => $request->validated('rejection_reason') ?? '',
+        ]);
+
+        return new MedicalCertificateResource($certificate);
+    }
+
+    /**
+     * Issue an approved certificate.
+     *
+     * Finalizes the printable document: the issuing clinician and the printed
+     * issue date can be adjusted at issue time and otherwise fall back to the
+     * request data / approving user. Only `Approved` certificates can be issued.
+     */
+    public function issue(MedicalCertificate $certificate, ReviewMedicalCertificateRequest $request): MedicalCertificateResource|JsonResponse
+    {
+        if (! $certificate->canTransitionTo('Issued')) {
+            return response()->json([
+                'message' => "Cannot issue a certificate in \"{$certificate->status}\" status.",
+            ], 422);
+        }
+
+        $certificate->update([
+            'status' => 'Issued',
+            'issue_date' => $request->validated('issue_date') ?? $certificate->issue_date->format('Y-m-d'),
+            // `?:` (not `??`) so an empty-string issued_by on the request falls
+            // back to the stored value, then to the issuing user's name.
+            'issued_by' => $request->validated('issued_by') ?: ($certificate->issued_by ?: $request->user()->name),
+        ]);
+
+        return new MedicalCertificateResource($certificate);
     }
 
     /**

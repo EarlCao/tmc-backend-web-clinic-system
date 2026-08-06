@@ -118,6 +118,9 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::post('/medical-certificates', [MedicalCertificateController::class, 'store'])->middleware('permission:medical_certificates.create');
+    Route::post('/medical-certificates/{certificate}/approve', [MedicalCertificateController::class, 'approve'])->middleware('permission:medical_certificates.approve');
+    Route::post('/medical-certificates/{certificate}/reject', [MedicalCertificateController::class, 'reject'])->middleware('permission:medical_certificates.approve');
+    Route::post('/medical-certificates/{certificate}/issue', [MedicalCertificateController::class, 'issue'])->middleware('permission:medical_certificates.update');
     Route::patch('/medical-certificates/{certificate}', [MedicalCertificateController::class, 'update'])->middleware('permission:medical_certificates.update');
     Route::delete('/medical-certificates/{certificate}', [MedicalCertificateController::class, 'destroy'])->middleware('permission:medical_certificates.delete');
 

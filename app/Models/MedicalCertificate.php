@@ -8,15 +8,34 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'reference', 'patient', 'patient_id', 'consultation_id', 'medical_record_id',
-    'issued_by', 'purpose', 'diagnosis', 'recommendation', 'issue_date',
+    'issued_by', 'requested_by', 'approved_by', 'approved_at', 'rejected_by',
+    'rejected_at', 'rejection_reason',
+    'purpose', 'diagnosis', 'recommendation', 'issue_date',
     'valid_until', 'status',
 ])]
 class MedicalCertificate extends Model
 {
     /**
-     * Certificate lifecycle statuses.
+     * Certificate lifecycle statuses, matching the frontend exactly.
+     *
+     * A certificate starts as a `Pending` request, is reviewed into either
+     * `Approved` or `Rejected`, then `Approved` requests are `Issued`; an
+     * issued certificate may later be `Void`ed for audit purposes.
      */
-    public const STATUSES = ['Issued', 'Void'];
+    public const STATUSES = ['Pending', 'Approved', 'Issued', 'Rejected', 'Void'];
+
+    /**
+     * Allowed status transitions (state machine — the dedicated workflow
+     * endpoints enforce these so the frontend cannot jump to an arbitrary
+     * status, and terminal states stay terminal).
+     */
+    public const TRANSITIONS = [
+        'Pending' => ['Approved', 'Rejected'],
+        'Approved' => ['Issued'],
+        'Issued' => ['Void'],
+        'Rejected' => [],
+        'Void' => [],
+    ];
 
     /**
      * The attributes that should be cast.
@@ -28,6 +47,8 @@ class MedicalCertificate extends Model
         return [
             'issue_date' => 'date:Y-m-d',
             'valid_until' => 'date:Y-m-d',
+            'approved_at' => 'datetime',
+            'rejected_at' => 'datetime',
         ];
     }
 
@@ -45,6 +66,14 @@ class MedicalCertificate extends Model
     public function medicalRecord(): BelongsTo
     {
         return $this->belongsTo(MedicalRecord::class, 'medical_record_id');
+    }
+
+    /**
+     * Whether this certificate may move to the given status.
+     */
+    public function canTransitionTo(string $status): bool
+    {
+        return in_array($status, self::TRANSITIONS[$this->status] ?? [], true);
     }
 
     /**

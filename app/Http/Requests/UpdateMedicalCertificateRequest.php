@@ -22,7 +22,9 @@ class UpdateMedicalCertificateRequest extends FormRequest
      * Get the validation rules that apply to the request.
      *
      * Partial updates are allowed — only the provided fields are patched.
-     * `status` is constrained to the certificate lifecycle values.
+     * `status` is deliberately restricted to `Void`: all other lifecycle
+     * moves must go through the dedicated workflow endpoints (approve,
+     * reject, issue) so the state machine and audit trail cannot be bypassed.
      *
      * @return array<string, ValidationRule|array<mixed>|string>
      */
@@ -42,7 +44,7 @@ class UpdateMedicalCertificateRequest extends FormRequest
             // silently compare against today instead of the stored date.
             'issue_date' => ['sometimes', 'date', 'required_with:valid_until'],
             'valid_until' => ['nullable', 'date', 'after_or_equal:issue_date'],
-            'status' => ['sometimes', 'string', 'in:Issued,Void'],
+            'status' => ['sometimes', 'string', 'in:Void'],
         ];
     }
 }
