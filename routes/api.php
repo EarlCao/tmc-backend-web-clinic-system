@@ -11,6 +11,7 @@ use App\Http\Controllers\PatientController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\StaffController;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -28,6 +29,26 @@ use Illuminate\Support\Facades\Route;
 | users without the right role are rejected with 403).
 |
 */
+
+// Public connectivity probe — the frontend calls this to show a clear
+// "backend offline" message instead of cryptic proxy errors (e.g. 502).
+// No authentication or permissions required; it only verifies the app and
+// its database connection are reachable.
+Route::get('/health', function () {
+    try {
+        DB::select('select 1');
+        $database = 'up';
+    } catch (\Throwable $e) {
+        $database = 'down';
+    }
+
+    return response()->json([
+        'status' => 'ok',
+        'service' => 'tmc-carelink-api',
+        'database' => $database,
+        'time' => now()->toIso8601String(),
+    ]);
+});
 
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
