@@ -70,6 +70,7 @@ class RolesAndPermissionsSeeder extends Seeder
             ],
             'Clinic Calendar' => [
                 ['name' => 'calendar.view', 'label' => 'View Clinic Calendar'],
+                ['name' => 'calendar.create', 'label' => 'Create Clinic Event'],
             ],
             'Reports' => [
                 ['name' => 'reports.view', 'label' => 'View Reports'],
@@ -138,9 +139,11 @@ class RolesAndPermissionsSeeder extends Seeder
             'medical_records.view', 'medical_records.create', 'medical_records.update',
             'medical_certificates.view', 'medical_certificates.create',
             'prescriptions.view', 'prescriptions.create',
-            'patients.view',
-            'calendar.view',
+            'patients.view', 'patients.create',
+            'schedules.view',
+            'calendar.view', 'calendar.create',
             'reports.view',
+            'audit_logs.view',
         ])->pluck('id'));
 
         // Nurse: clinic care support.
@@ -155,8 +158,10 @@ class RolesAndPermissionsSeeder extends Seeder
             'medical_records.view', 'medical_records.create', 'medical_records.update',
             'medical_certificates.view', 'medical_certificates.create',
             'prescriptions.view', 'prescriptions.create',
-            'patients.view',
-            'calendar.view',
+            'patients.view', 'patients.create',
+            'schedules.view',
+            'calendar.view', 'calendar.create',
+            'audit_logs.view',
         ])->pluck('id'));
 
         // Staff: general staff read access.
@@ -168,6 +173,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'dashboard.view',
             'appointments.view',
             'patients.view',
+            'schedules.view',
+            'calendar.view',
+            'audit_logs.view',
         ])->pluck('id'));
 
         // Any user still without a role defaults to the least-privilege role.

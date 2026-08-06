@@ -1,9 +1,16 @@
 <?php
 
+use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ClinicEventController;
+use App\Http\Controllers\ClinicInsightsController;
+use App\Http\Controllers\ConsultationController;
+use App\Http\Controllers\MedicalRecordController;
+use App\Http\Controllers\PatientController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\StaffController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -51,4 +58,43 @@ Route::middleware('auth:sanctum')->group(function () {
     // so the check happens inside the controller rather than a static middleware.
     Route::patch('/appointments/{appointment}/status', [AppointmentController::class, 'updateStatus']);
     Route::post('/appointments/{appointment}/reschedule', [AppointmentController::class, 'reschedule'])->middleware('permission:appointments.reschedule');
+
+    // Staff roster (dashboard duty schedule)
+    Route::get('/staff', [StaffController::class, 'index'])->middleware('permission:schedules.view');
+    Route::patch('/staff/status', [StaffController::class, 'updateStatus'])->middleware('permission:schedules.update');
+
+    // Patients registry
+    Route::get('/patients', [PatientController::class, 'index'])->middleware('permission:patients.view');
+    Route::post('/patients', [PatientController::class, 'store'])->middleware('permission:patients.create');
+
+    // Consultations
+    Route::get('/consultations', [ConsultationController::class, 'index'])->middleware('permission:consultations.view');
+    Route::post('/consultations', [ConsultationController::class, 'store'])->middleware('permission:consultations.create');
+    Route::post('/consultations/{consultation}/start', [ConsultationController::class, 'start'])->middleware('permission:consultations.create');
+    Route::patch('/consultations/{consultation}', [ConsultationController::class, 'update'])->middleware('permission:consultations.update');
+    Route::post('/consultations/{consultation}/complete', [ConsultationController::class, 'complete'])->middleware('permission:consultations.update');
+
+    // Medical records (+ nested conditions/allergies)
+    Route::get('/medical-records', [MedicalRecordController::class, 'index'])->middleware('permission:medical_records.view');
+    Route::middleware('permission:medical_records.update')->group(function () {
+        Route::post('/medical-records/{record}/conditions', [MedicalRecordController::class, 'storeCondition']);
+        Route::patch('/medical-records/{record}/conditions/{condition}', [MedicalRecordController::class, 'updateCondition']);
+        Route::delete('/medical-records/{record}/conditions/{condition}', [MedicalRecordController::class, 'destroyCondition']);
+        Route::post('/medical-records/{record}/allergies', [MedicalRecordController::class, 'storeAllergy']);
+        Route::patch('/medical-records/{record}/allergies/{allergy}', [MedicalRecordController::class, 'updateAllergy']);
+        Route::delete('/medical-records/{record}/allergies/{allergy}', [MedicalRecordController::class, 'destroyAllergy']);
+    });
+
+    // Campus health events
+    Route::get('/events', [ClinicEventController::class, 'index'])->middleware('permission:calendar.view');
+    Route::post('/events', [ClinicEventController::class, 'store'])->middleware('permission:calendar.create');
+
+    // Dashboard insights (activity bars + peak hours)
+    Route::get('/insights/activity', [ClinicInsightsController::class, 'activity'])->middleware('permission:dashboard.view');
+    Route::get('/insights/peak-hours', [ClinicInsightsController::class, 'peakHours'])->middleware('permission:dashboard.view');
+
+    // Activity / audit log
+    Route::get('/activity-logs', [ActivityLogController::class, 'index'])->middleware('permission:audit_logs.view');
+    // Any authenticated user may record their own actions in the log.
+    Route::post('/activity-logs', [ActivityLogController::class, 'store']);
 });
