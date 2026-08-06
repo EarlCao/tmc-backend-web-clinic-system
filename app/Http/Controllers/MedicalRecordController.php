@@ -2,6 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreMedicalRecordAllergyRequest;
+use App\Http\Requests\StoreMedicalRecordConditionRequest;
+use App\Http\Requests\UpdateMedicalRecordAllergyRequest;
+use App\Http\Requests\UpdateMedicalRecordConditionRequest;
 use App\Http\Resources\MedicalRecordResource;
 use App\Models\MedicalRecord;
 use App\Models\MedicalRecordAllergy;
@@ -14,14 +18,33 @@ class MedicalRecordController extends Controller
 {
     /**
      * List medical records with their clinical child sections loaded.
+     *
+     * Optional query params mirror the Appointments/Consultations lists so
+     * the frontend can move search/filtering server-side later:
+     *   ?search=<name|patient id|condition|allergen>
+     *   ?status=Active|Archived
      */
-    public function index(): AnonymousResourceCollection
+    public function index(Request $request): AnonymousResourceCollection
     {
-        return MedicalRecordResource::collection(
-            MedicalRecord::with(['histories', 'conditions', 'allergies', 'medications'])
-                ->orderBy('name')
-                ->get(),
-        );
+        $query = MedicalRecord::with(['histories', 'conditions', 'allergies', 'medications']);
+
+        $search = trim((string) $request->query('search'));
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('patient_id', 'like', "%{$search}%")
+                    ->orWhere('id', 'like', "%{$search}%")
+                    ->orWhereHas('conditions', fn ($c) => $c->where('name', 'like', "%{$search}%"))
+                    ->orWhereHas('allergies', fn ($a) => $a->where('allergen', 'like', "%{$search}%"));
+            });
+        }
+
+        $status = $request->query('status');
+        if ($status && $status !== 'All') {
+            $query->where('status', $status);
+        }
+
+        return MedicalRecordResource::collection($query->orderBy('name')->get());
     }
 
     // ---------- Medical conditions ----------
@@ -29,14 +52,9 @@ class MedicalRecordController extends Controller
     /**
      * Add a diagnosed condition to a record; returns the full updated record.
      */
-    public function storeCondition(Request $request, MedicalRecord $record): JsonResponse
+    public function storeCondition(StoreMedicalRecordConditionRequest $request, MedicalRecord $record): JsonResponse
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'status' => ['nullable', 'string', 'max:255'],
-            'diagnosedDate' => ['nullable', 'date'],
-            'notes' => ['nullable', 'string'],
-        ]);
+        $validated = $request->validated();
 
         $record->conditions()->create([
             'name' => $validated['name'],
@@ -53,7 +71,7 @@ class MedicalRecordController extends Controller
      * Update a condition on a record; returns the full updated record.
      */
     public function updateCondition(
-        Request $request,
+        UpdateMedicalRecordConditionRequest $request,
         MedicalRecord $record,
         MedicalRecordCondition $condition,
     ): JsonResponse {
@@ -61,12 +79,7 @@ class MedicalRecordController extends Controller
             abort(404, 'Condition not found on this record.');
         }
 
-        $validated = $request->validate([
-            'name' => ['nullable', 'string', 'max:255'],
-            'status' => ['nullable', 'string', 'max:255'],
-            'diagnosedDate' => ['nullable', 'date'],
-            'notes' => ['nullable', 'string'],
-        ]);
+        $validated = $request->validated();
 
         $condition->update([
             'name' => $validated['name'] ?? $condition->name,
@@ -101,15 +114,9 @@ class MedicalRecordController extends Controller
     /**
      * Record an allergy on a record; returns the full updated record.
      */
-    public function storeAllergy(Request $request, MedicalRecord $record): JsonResponse
+    public function storeAllergy(StoreMedicalRecordAllergyRequest $request, MedicalRecord $record): JsonResponse
     {
-        $validated = $request->validate([
-            'allergen' => ['required', 'string', 'max:255'],
-            'reaction' => ['nullable', 'string', 'max:255'],
-            'severity' => ['nullable', 'string', 'max:255'],
-            'dateRecorded' => ['nullable', 'date'],
-            'notes' => ['nullable', 'string'],
-        ]);
+        $validated = $request->validated();
 
         $record->allergies()->create([
             'allergen' => $validated['allergen'],
@@ -127,7 +134,7 @@ class MedicalRecordController extends Controller
      * Update an allergy on a record; returns the full updated record.
      */
     public function updateAllergy(
-        Request $request,
+        UpdateMedicalRecordAllergyRequest $request,
         MedicalRecord $record,
         MedicalRecordAllergy $allergy,
     ): JsonResponse {
@@ -135,13 +142,7 @@ class MedicalRecordController extends Controller
             abort(404, 'Allergy not found on this record.');
         }
 
-        $validated = $request->validate([
-            'allergen' => ['nullable', 'string', 'max:255'],
-            'reaction' => ['nullable', 'string', 'max:255'],
-            'severity' => ['nullable', 'string', 'max:255'],
-            'dateRecorded' => ['nullable', 'date'],
-            'notes' => ['nullable', 'string'],
-        ]);
+        $validated = $request->validated();
 
         $allergy->update([
             'allergen' => $validated['allergen'] ?? $allergy->allergen,
