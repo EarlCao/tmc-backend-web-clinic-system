@@ -68,7 +68,7 @@ class PrescriptionsTest extends TestCase
             'consultation_id' => null,
             'medical_record_id' => null,
             'prescribed_by' => 'Dr. R. Mendoza',
-            'date' => '2026-08-10',
+            'prescription_date' => '2026-08-10',
         ], $overrides));
 
         $prescription->medications()->create([
@@ -188,9 +188,9 @@ class PrescriptionsTest extends TestCase
     public function test_list_can_filter_by_patient_and_date(): void
     {
         $admin = $this->adminUser();
-        $this->makePrescription(['patient' => 'Rica Bautista', 'patient_id' => '2024-0301', 'date' => '2026-08-01']);
-        $this->makePrescription(['patient' => 'Another Patient', 'patient_id' => '2024-0302', 'date' => '2026-08-01']);
-        $this->makePrescription(['patient' => 'Rica Bautista', 'patient_id' => '2024-0301', 'date' => '2026-08-02']);
+        $this->makePrescription(['patient' => 'Rica Bautista', 'patient_id' => '2024-0301', 'prescription_date' => '2026-08-01']);
+        $this->makePrescription(['patient' => 'Another Patient', 'patient_id' => '2024-0302', 'prescription_date' => '2026-08-01']);
+        $this->makePrescription(['patient' => 'Rica Bautista', 'patient_id' => '2024-0301', 'prescription_date' => '2026-08-02']);
 
         $this->actingAsUser($admin);
 
@@ -348,7 +348,7 @@ class PrescriptionsTest extends TestCase
         $this->assertDatabaseHas('prescriptions', [
             'consultation_id' => $consultation->id,
             'medical_record_id' => $record->id,
-            'date' => '2026-08-09',
+            'prescription_date' => '2026-08-09',
         ]);
     }
 

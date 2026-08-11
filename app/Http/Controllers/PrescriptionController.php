@@ -51,13 +51,13 @@ class PrescriptionController extends Controller
 
         $date = $request->query('date');
         if ($date) {
-            $query->whereDate('date', $date);
+            $query->whereDate('prescription_date', $date);
         }
 
         $perPage = max(1, min(50, (int) $request->query('per_page', 8)));
 
         return PrescriptionResource::collection(
-            $query->orderByDesc('date')->orderByDesc('id')->paginate($perPage)->withQueryString(),
+            $query->orderByDesc('prescription_date')->orderByDesc('id')->paginate($perPage)->withQueryString(),
         );
     }
 
@@ -94,7 +94,7 @@ class PrescriptionController extends Controller
                 'medical_record_id' => $validated['medical_record_id']
                     ?? MedicalRecord::where('patient_id', $validated['patient_id'] ?? null)->value('id'),
                 'prescribed_by' => ($validated['prescribed_by'] ?? '') ?: $request->user()->name,
-                'date' => $date,
+                'prescription_date' => $date,
             ]);
 
             $this->syncMedications($prescription, $validated['medications']);
@@ -139,7 +139,7 @@ class PrescriptionController extends Controller
                 $prescription->patient = $validated['patient'];
             }
             if (array_key_exists('date', $validated)) {
-                $prescription->date = $validated['date'];
+                $prescription->prescription_date = $validated['date'];
             }
             if (array_key_exists('prescribed_by', $validated) && $validated['prescribed_by'] !== null) {
                 $prescription->prescribed_by = $validated['prescribed_by'] ?: $prescription->prescribed_by;

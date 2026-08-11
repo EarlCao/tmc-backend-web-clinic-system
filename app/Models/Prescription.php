@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'reference', 'patient', 'patient_id', 'consultation_id', 'medical_record_id',
-    'prescribed_by', 'date',
+    'prescribed_by', 'prescription_date',
 ])]
 class Prescription extends Model
 {
@@ -21,7 +21,7 @@ class Prescription extends Model
     protected function casts(): array
     {
         return [
-            'date' => 'date:Y-m-d',
+            'prescription_date' => 'date:Y-m-d',
         ];
     }
 

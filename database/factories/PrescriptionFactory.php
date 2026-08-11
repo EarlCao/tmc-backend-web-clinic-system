@@ -43,7 +43,7 @@ class PrescriptionFactory extends Factory
             'consultation_id' => null,
             'medical_record_id' => null,
             'prescribed_by' => fake()->randomElement(['Dr. R. Mendoza', 'Dr. S. Lopez', 'Nurse C. Villanueva', 'Nurse J. Santos']),
-            'date' => $date->format('Y-m-d'),
+            'prescription_date' => $date->format('Y-m-d'),
         ];
     }
 }
