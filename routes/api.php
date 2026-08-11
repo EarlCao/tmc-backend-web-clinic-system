@@ -10,6 +10,7 @@ use App\Http\Controllers\MedicalCertificateController;
 use App\Http\Controllers\MedicalRecordController;
 use App\Http\Controllers\PatientController;
 use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\PrescriptionController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\StaffController;
 use Illuminate\Support\Facades\DB;
@@ -123,6 +124,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/medical-certificates/{certificate}/issue', [MedicalCertificateController::class, 'issue'])->middleware('permission:medical_certificates.update');
     Route::patch('/medical-certificates/{certificate}', [MedicalCertificateController::class, 'update'])->middleware('permission:medical_certificates.update');
     Route::delete('/medical-certificates/{certificate}', [MedicalCertificateController::class, 'destroy'])->middleware('permission:medical_certificates.delete');
+
+    // Prescriptions (Module 7)
+    Route::middleware('permission:prescriptions.view')->group(function () {
+        Route::get('/prescriptions', [PrescriptionController::class, 'index']);
+        Route::get('/prescriptions/{prescription}', [PrescriptionController::class, 'show']);
+    });
+
+    Route::post('/prescriptions', [PrescriptionController::class, 'store'])->middleware('permission:prescriptions.create');
+    Route::patch('/prescriptions/{prescription}', [PrescriptionController::class, 'update'])->middleware('permission:prescriptions.update');
 
     // Campus health events
     Route::get('/events', [ClinicEventController::class, 'index'])->middleware('permission:calendar.view');
